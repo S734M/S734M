@@ -31,7 +31,7 @@ object DeleteDialog {
     messageRecords: Set<MessageRecord>,
     title: CharSequence = context.resources.getQuantityString(R.plurals.ConversationFragment_delete_selected_messages, messageRecords.size, messageRecords.size),
     message: CharSequence? = null,
-    forceRemoteDelete: Boolean = false
+    forceRemoteDelete: Boolean = true
   ): Single<Pair<Boolean, Boolean>> = Single.create { emitter ->
     val builder = MaterialAlertDialogBuilder(context)
 
