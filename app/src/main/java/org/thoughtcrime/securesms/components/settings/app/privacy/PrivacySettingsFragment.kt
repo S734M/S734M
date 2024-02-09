@@ -235,7 +235,7 @@ class PrivacySettingsFragment : DSLSettingsFragment(R.string.preferences__privac
         title = DSLSettingsText.from(R.string.preferences__screen_security),
         summary = DSLSettingsText.from(R.string.PrivacySettingsFragment__block_screenshots_in_the_recents_list_and_inside_the_app),
         isChecked = state.screenSecurity || ScreenLockController.alwaysSetSecureFlagOnResume,
-        isEnabled = !ScreenLockController.alwaysSetSecureFlagOnResume,
+        isEnabled = !state.screenSecurity,
         onClick = {
           viewModel.setScreenSecurityEnabled(!state.screenSecurity)
           WindowUtil.initializeScreenshotSecurity(requireContext(), requireActivity().window)
