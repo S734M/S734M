@@ -649,7 +649,7 @@ public final class ConversationListItem extends ConstraintLayout implements Bind
       if (extra != null && extra.isViewOnce()) {
         return emphasisAdded(context, getViewOnceDescription(context, thread.getContentType()), defaultTint);
       } else if (extra != null && extra.isRemoteDelete()) {
-        return emphasisAdded(context, context.getString(thread.isOutgoing() ? R.string.ThreadRecord_you_deleted_this_message : R.string.ThreadRecord_this_message_was_deleted), defaultTint);
+        return emphasisAdded(context, context.getString(R.string.ThreadRecord_this_message_was_deleted), defaultTint);
       } else {
         SpannableStringBuilder sourceBody = new SpannableStringBuilder(thread.getBody());
         MessageStyler.style(thread.getDate(), thread.getBodyRanges(), sourceBody);
