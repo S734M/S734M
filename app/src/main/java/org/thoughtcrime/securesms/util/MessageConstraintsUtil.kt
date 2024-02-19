@@ -26,10 +26,9 @@ object MessageConstraintsUtil {
 
     val messageTimestamp = if (selfIsDeleteSender && targetMessage.isOutgoing) targetMessage.dateSent else targetMessage.serverTimestamp
 
-    return isValidIncomingOutgoing &&
-      isValidSender &&
-      ((deleteServerTimestamp - messageTimestamp < RECEIVE_THRESHOLD) || (selfIsDeleteSender && targetMessage.isOutgoing))
+    return true
   }
+
 
   @JvmStatic
   fun isValidEditMessageReceive(targetMessage: MessageRecord, editSender: Recipient, editServerTimestamp: Long): Boolean {
@@ -79,13 +78,11 @@ object MessageConstraintsUtil {
 
   private fun isValidRemoteDeleteSend(message: MessageRecord, currentTime: Long): Boolean {
     return !message.isUpdate &&
-      message.isOutgoing &&
       message.isPush &&
       (!message.toRecipient.isGroup || message.toRecipient.isActiveGroup) &&
       !message.isRemoteDelete &&
       !message.hasGiftBadge() &&
-      !message.isPaymentNotification &&
-      (currentTime - message.dateSent < SEND_THRESHOLD || message.toRecipient.isSelf)
+      !message.isPaymentNotification
   }
 
   private fun isSelf(recipientId: RecipientId): Boolean {
