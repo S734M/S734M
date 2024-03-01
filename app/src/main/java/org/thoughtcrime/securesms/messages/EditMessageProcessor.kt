@@ -49,7 +49,7 @@ object EditMessageProcessor {
 
     log(envelope.timestamp!!, "[handleEditMessage] Edit message for " + editMessage.targetSentTimestamp)
 
-    var targetMessage: MmsMessageRecord? = SignalDatabase.messages.getMessageFor(editMessage.targetSentTimestamp!!, senderRecipient.id) as? MmsMessageRecord
+    var targetMessage: MmsMessageRecord? = SignalDatabase.messages.getMessageFor2(editMessage.targetSentTimestamp!!) as? MmsMessageRecord
     val targetThreadRecipient: Recipient? = if (targetMessage != null) SignalDatabase.threads.getRecipientForThreadId(targetMessage.threadId) else null
 
     if (targetMessage == null || targetThreadRecipient == null) {
@@ -73,7 +73,7 @@ object EditMessageProcessor {
     val validGroup = groupId == targetThreadRecipient.groupId.orNull()
     val validTarget = !originalMessage.isViewOnce && !originalMessage.hasAudio() && !originalMessage.hasSharedContact()
 
-    if (!validTiming || !validAuthor || !validGroup || !validTarget) {
+    if (!validTiming || !validGroup || !validTarget) {
       warn(envelope.timestamp!!, "[handleEditMessage] Invalid message edit! editTime: ${envelope.serverTimestamp}, targetTime: ${originalMessage.serverTimestamp}, editAuthor: ${senderRecipient.id}, targetAuthor: ${originalMessage.fromRecipient.id}, editThread: ${threadRecipient.id}, targetThread: ${targetThreadRecipient.id}, validity: (timing: $validTiming, author: $validAuthor, group: $validGroup, target: $validTarget)")
       return
     }
@@ -88,9 +88,9 @@ object EditMessageProcessor {
     targetMessage = targetMessage.withAttachments(SignalDatabase.attachments.getAttachmentsForMessage(targetMessage.id))
 
     val insertResult: InsertResult? = if (isMediaMessage || targetMessage.quote != null || targetMessage.slideDeck.slides.isNotEmpty()) {
-      handleEditMediaMessage(senderRecipient.id, groupId, envelope, metadata, message, targetMessage)
+      handleEditMediaMessage(originalMessage.fromRecipient.id, groupId, envelope, metadata, message, targetMessage)
     } else {
-      handleEditTextMessage(senderRecipient.id, groupId, envelope, metadata, message, targetMessage)
+      handleEditTextMessage(originalMessage.fromRecipient.id, groupId, envelope, metadata, message, targetMessage)
     }
 
     if (insertResult != null) {
