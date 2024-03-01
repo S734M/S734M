@@ -239,7 +239,7 @@ public final class ContactSelectionListFragment extends LoggingFragment {
                  if (safeArguments().getBoolean(RECENTS, requireActivity().getIntent().getBooleanExtra(RECENTS, false))) {
                    contactSearchMediator.refresh();
                  } else {
-                   initializeNoContactsPermission();
+                   contactSearchMediator.refresh();
                  }
                })
                .execute();
