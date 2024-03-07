@@ -639,25 +639,8 @@ open class V2ConversationItemTextOnlyViewHolder<Model : MappingModel<Model>>(
       binding.footerDate.setText(R.string.ConversationItem_click_to_approve_unencrypted)
     } else if (record.isRateLimited) {
       binding.footerDate.setText(R.string.ConversationItem_send_paused)
-    } else if (record.isScheduled()) {
-      binding.footerDate.text = conversationMessage.computedProperties.formattedDate.value
     } else {
-      var dateLabel = conversationMessage.computedProperties.formattedDate.value
-      if (conversationContext.displayMode != ConversationItemDisplayMode.Detailed && record is MmsMessageRecord && record.isEditMessage()) {
-        dateLabel = if (conversationMessage.computedProperties.formattedDate.isNow) {
-          getContext().getString(R.string.ConversationItem_edited_now_timestamp_footer)
-        } else if (conversationMessage.computedProperties.formattedDate.isRelative) {
-          getContext().getString(R.string.ConversationItem_edited_relative_timestamp_footer, dateLabel)
-        } else {
-          getContext().getString(R.string.ConversationItem_edited_absolute_timestamp_footer, dateLabel)
-        }
-
-        binding.footerDate.setOnClickListener {
-          conversationContext.clickListener.onEditedIndicatorClicked(record)
-        }
-      }
-
-      binding.footerDate.text = dateLabel
+      binding.footerDate.text = conversationMessage.computedProperties.formattedDate.value
     }
   }
 
