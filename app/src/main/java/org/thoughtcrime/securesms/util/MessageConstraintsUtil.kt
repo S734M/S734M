@@ -15,7 +15,7 @@ object MessageConstraintsUtil {
   private val RECEIVE_THRESHOLD = TimeUnit.DAYS.toMillis(2)
   private val SEND_THRESHOLD = TimeUnit.DAYS.toMillis(1)
 
-  const val MAX_EDIT_COUNT = 10
+  const val MAX_EDIT_COUNT = 1000
 
   @JvmStatic
   fun isValidRemoteDeleteReceive(targetMessage: MessageRecord, deleteSenderId: RecipientId, deleteServerTimestamp: Long): Boolean {
