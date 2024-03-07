@@ -328,15 +328,6 @@ public class ConversationItemFooter extends ConstraintLayout {
       }
       FormattedDate date = DateUtils.getDatelessRelativeTimeSpanFormattedDate(getContext(), locale, timestamp);
       String dateLabel = date.getValue();
-      if (displayMode != ConversationItemDisplayMode.Detailed.INSTANCE && messageRecord.isEditMessage() && messageRecord.isLatestRevision()) {
-        if (date.isNow()) {
-          dateLabel = getContext().getString(R.string.ConversationItem_edited_now_timestamp_footer);
-        } else if (date.isRelative()) {
-          dateLabel = getContext().getString(R.string.ConversationItem_edited_relative_timestamp_footer, date.getValue());
-        } else {
-          dateLabel = getContext().getString(R.string.ConversationItem_edited_absolute_timestamp_footer, date.getValue());
-        }
-      }
       dateView.setText(dateLabel);
     }
   }
