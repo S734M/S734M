@@ -48,19 +48,29 @@ object EditMessageProcessor {
     val editMessage = content.editMessage!!
 
     log(envelope.timestamp!!, "[handleEditMessage] Edit message for " + editMessage.targetSentTimestamp)
-
-    var targetMessage: MmsMessageRecord? = SignalDatabase.messages.getMessageFor2(editMessage.targetSentTimestamp!!) as? MmsMessageRecord
-    val targetThreadRecipient: Recipient? = if (targetMessage != null) SignalDatabase.threads.getRecipientForThreadId(targetMessage.threadId) else null
+    
+    var targetMessage: MmsMessageRecord? = SignalDatabase.messages.getMessageFor(editMessage.targetSentTimestamp!!, senderRecipient.id) as? MmsMessageRecord
+    var targetMessage2: MmsMessageRecord? = SignalDatabase.messages.getMessageFor2(editMessage.targetSentTimestamp!!) as? MmsMessageRecord
+    
+    var targetThreadRecipient: Recipient? = if (targetMessage != null) SignalDatabase.threads.getRecipientForThreadId(targetMessage.threadId) else null
+    var targetThreadRecipient2: Recipient? = if (targetMessage2 != null) SignalDatabase.threads.getRecipientForThreadId(targetMessage2.threadId) else null
+    var target2 = false
 
     if (targetMessage == null || targetThreadRecipient == null) {
       warn(envelope.timestamp!!, "[handleEditMessage] Could not find matching message! timestamp: ${editMessage.targetSentTimestamp}  author: ${senderRecipient.id}")
 
-      if (earlyMessageCacheEntry != null) {
-        ApplicationDependencies.getEarlyMessageCache().store(senderRecipient.id, editMessage.targetSentTimestamp!!, earlyMessageCacheEntry)
-        PushProcessEarlyMessagesJob.enqueue()
-      }
+      if (targetMessage2 == null || targetThreadRecipient2 == null) {
+        warn(envelope.timestamp!!, "[handleEditMessage] Could not find ANY matching message! timestamp: ${editMessage.targetSentTimestamp}")
 
-      return
+        if (earlyMessageCacheEntry != null) {
+          ApplicationDependencies.getEarlyMessageCache().store(senderRecipient.id, editMessage.targetSentTimestamp!!, earlyMessageCacheEntry)
+          PushProcessEarlyMessagesJob.enqueue()
+        }
+        return
+      }
+      targetMessage = targetMessage2
+      targetThreadRecipient = targetThreadRecipient2
+      target2 = true
     }
 
     val message = editMessage.dataMessage!!
@@ -73,8 +83,10 @@ object EditMessageProcessor {
     val validGroup = groupId == targetThreadRecipient.groupId.orNull()
     val validTarget = !originalMessage.isViewOnce && !originalMessage.hasAudio() && !originalMessage.hasSharedContact()
 
-    if (!validTiming || !validGroup || !validTarget) {
-      warn(envelope.timestamp!!, "[handleEditMessage] Invalid message edit! editTime: ${envelope.serverTimestamp}, targetTime: ${originalMessage.serverTimestamp}, editAuthor: ${senderRecipient.id}, targetAuthor: ${originalMessage.fromRecipient.id}, editThread: ${threadRecipient.id}, targetThread: ${targetThreadRecipient.id}, validity: (timing: $validTiming, author: $validAuthor, group: $validGroup, target: $validTarget)")
+    warn(envelope.timestamp!!, "[handleEditMessage] Message edit! editTime: ${envelope.serverTimestamp}, targetTime: ${originalMessage.serverTimestamp}, editAuthor: ${senderRecipient.id}, targetAuthor: ${originalMessage.fromRecipient.id}, editThread: ${threadRecipient.id}, targetThread: ${targetThreadRecipient.id}, target2: ${target2} validity: (timing: $validTiming, author: $validAuthor, group: $validGroup, target: $validTarget)")
+
+    if (!validGroup || !validTarget) {
+      warn(envelope.timestamp!!, "[handleEditMessage] Invalid message edit!)")
       return
     }
 
@@ -86,11 +98,19 @@ object EditMessageProcessor {
     DataMessageProcessor.notifyTypingStoppedFromIncomingMessage(context, senderRecipient, threadRecipient.id, metadata.sourceDeviceId)
 
     targetMessage = targetMessage.withAttachments(SignalDatabase.attachments.getAttachmentsForMessage(targetMessage.id))
-
+    
     val insertResult: InsertResult? = if (isMediaMessage || targetMessage.quote != null || targetMessage.slideDeck.slides.isNotEmpty()) {
-      handleEditMediaMessage(originalMessage.fromRecipient.id, groupId, envelope, metadata, message, targetMessage)
+      if (originalMessage.fromRecipient.isSelf) {
+        handleEditMediaMessageOutgoing(originalMessage.fromRecipient.id, groupId, envelope, metadata, message, targetMessage)
+      } else {
+        handleEditMediaMessage(originalMessage.fromRecipient.id, groupId, envelope, metadata, message, targetMessage)
+      }
     } else {
-      handleEditTextMessage(originalMessage.fromRecipient.id, groupId, envelope, metadata, message, targetMessage)
+      if (originalMessage.fromRecipient.isSelf) {
+        handleEditTextMessageOutgoing(originalMessage.fromRecipient.id, groupId, envelope, metadata, message, targetMessage)
+      } else {
+        handleEditTextMessage(originalMessage.fromRecipient.id, groupId, envelope, metadata, message, targetMessage)
+      }
     }
 
     if (insertResult != null) {
@@ -172,6 +192,66 @@ object EditMessageProcessor {
     return insertResult
   }
 
+  private fun handleEditMediaMessageOutgoing(
+    senderRecipientId: RecipientId,
+    groupId: GroupId.V2?,
+    envelope: Envelope,
+    metadata: EnvelopeMetadata,
+    message: DataMessage,
+    targetMessage: MmsMessageRecord
+  ): InsertResult? {
+    val messageRanges: BodyRangeList? = message.bodyRanges.filter { it.mentionAci == null }.toList().toBodyRangeList()
+    val targetQuote = targetMessage.quote
+    val quote: QuoteModel? = if (targetQuote != null && message.quote != null) {
+      QuoteModel(
+        targetQuote.id,
+        targetQuote.author,
+        targetQuote.displayText.toString(),
+        targetQuote.isOriginalMissing,
+        emptyList(),
+        null,
+        targetQuote.quoteType,
+        null
+      )
+    } else {
+      null
+    }
+    val attachments = message.attachments.toPointersWithinLimit()
+    attachments.filter {
+      MediaUtil.SlideType.LONG_TEXT == MediaUtil.getSlideTypeFromContentType(it.contentType)
+    }
+    val mediaMessage = IncomingMessage(
+      type = MessageType.NORMAL,
+      from = senderRecipientId,
+      sentTimeMillis = message.timestamp!!,
+      serverTimeMillis = envelope.serverTimestamp!!,
+      receivedTimeMillis = targetMessage.dateReceived,
+      expiresIn = targetMessage.expiresIn,
+      isViewOnce = message.isViewOnce == true,
+      isUnidentified = metadata.sealedSender,
+      body = message.body,
+      groupId = groupId,
+      attachments = attachments,
+      quote = quote,
+      sharedContacts = emptyList(),
+      linkPreviews = DataMessageProcessor.getLinkPreviews(message.preview, message.body ?: "", false),
+      mentions = DataMessageProcessor.getMentions(message.bodyRanges),
+      serverGuid = envelope.serverGuid,
+      messageRanges = messageRanges
+    )
+
+    val insertResult = SignalDatabase.messages.insertEditMessageInbox(mediaMessage, targetMessage).orNull()
+    if (insertResult?.insertedAttachments != null) {
+      SignalDatabase.runPostSuccessfulTransaction {
+        val downloadJobs: List<AttachmentDownloadJob> = insertResult.insertedAttachments.mapNotNull { (_, attachmentId) ->
+          AttachmentDownloadJob(insertResult.messageId, attachmentId, false)
+        }
+        ApplicationDependencies.getJobManager().addAll(downloadJobs)
+      }
+    }
+    return insertResult
+  }
+
   private fun handleEditTextMessage(
     senderRecipientId: RecipientId,
     groupId: GroupId.V2?,
@@ -194,5 +274,32 @@ object EditMessageProcessor {
     )
 
     return SignalDatabase.messages.insertEditMessageInbox(textMessage, targetMessage).orNull()
+  }
+  
+  private fun handleEditTextMessageOutgoing(
+    senderRecipientId: RecipientId,
+    groupId: GroupId.V2?,
+    envelope: Envelope,
+    metadata: EnvelopeMetadata,
+    message: DataMessage,
+    targetMessage: MmsMessageRecord
+  ): InsertResult? {
+    val textMessage = OutgoingMessage(
+      threadRecipient = if (targetMessage != null) SignalDatabase.threads.getRecipientForThreadId(targetMessage.threadId) else null,
+      sentTimeMillis = envelope.timestamp!!,
+      body = message.body,
+      expiresIn = targetMessage.expiresIn,
+      isUrgent = true,
+      isSecure = true,
+      bodyRanges =  message.bodyRanges,
+      messagetoEdit = targetMessage.originalMessageId 
+    )
+
+    val editMessageId = SignalDatabase.messages.insertEditMessageOutbox(textMessage, targetMessage.threadId,false,null).orNull()
+    SignalDatabase.messages.markAsSent(editMessageId,true)
+    if ((targetMessage.expiresIn ?: 0) > 0) {
+      SignalDatabase.messages.markExpireStarted(editMessageId,envelope.timestamp!!)
+    }
+    return editMessageId
   }
 }
