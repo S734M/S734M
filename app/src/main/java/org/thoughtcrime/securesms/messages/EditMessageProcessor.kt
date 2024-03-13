@@ -21,6 +21,7 @@ import org.thoughtcrime.securesms.messages.SignalServiceProtoUtil.groupId
 import org.thoughtcrime.securesms.messages.SignalServiceProtoUtil.isMediaMessage
 import org.thoughtcrime.securesms.messages.SignalServiceProtoUtil.toPointersWithinLimit
 import org.thoughtcrime.securesms.mms.IncomingMessage
+import org.thoughtcrime.securesms.mms.OutgoingMessage
 import org.thoughtcrime.securesms.mms.QuoteModel
 import org.thoughtcrime.securesms.notifications.v2.ConversationId.Companion.forConversation
 import org.thoughtcrime.securesms.recipients.Recipient
@@ -295,11 +296,12 @@ object EditMessageProcessor {
       messagetoEdit = targetMessage.originalMessageId 
     )
 
-    val editMessageId = SignalDatabase.messages.insertEditMessageOutbox(textMessage, targetMessage.threadId,false,null).orNull()
-    SignalDatabase.messages.markAsSent(editMessageId,true)
-    if ((targetMessage.expiresIn ?: 0) > 0) {
-      SignalDatabase.messages.markExpireStarted(editMessageId,envelope.timestamp!!)
-    }
-    return editMessageId
+    return SignalDatabase.messages.insertEditMessageInbox(textMessage, targetMessage).orNull()
+    #val editMessageId = SignalDatabase.messages.insertEditMessageInbox(textMessage, targetMessage.threadId,false,null).orNull()
+    #SignalDatabase.messages.markAsSent(editMessageId,true)
+    #if ((targetMessage.expiresIn ?: 0) > 0) {
+    #  SignalDatabase.messages.markExpireStarted(editMessageId,envelope.timestamp!!)
+    #}
+    #return editMessageId
   }
 }
