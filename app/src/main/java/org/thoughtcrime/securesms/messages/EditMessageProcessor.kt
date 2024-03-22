@@ -286,22 +286,22 @@ object EditMessageProcessor {
     targetMessage: MmsMessageRecord
   ): InsertResult? {
     val textMessage = OutgoingMessage(
-      threadRecipient = if (targetMessage != null) SignalDatabase.threads.getRecipientForThreadId(targetMessage.threadId) else null,
+      threadRecipient = SignalDatabase.threads.getRecipientForThreadId(targetMessage.threadId!!)!!,
       sentTimeMillis = envelope.timestamp!!,
-      body = message.body,
+      body = message.body!!,
       expiresIn = targetMessage.expiresIn,
       isUrgent = true,
       isSecure = true,
-      bodyRanges =  message.bodyRanges,
-      messagetoEdit = targetMessage.originalMessageId 
+      bodyRanges =  message.bodyRanges.toBodyRangeList(),
+      messageToEdit = targetMessage.originalMessageId 
     )
 
     return SignalDatabase.messages.insertEditMessageInbox(textMessage, targetMessage).orNull()
-    #val editMessageId = SignalDatabase.messages.insertEditMessageInbox(textMessage, targetMessage.threadId,false,null).orNull()
-    #SignalDatabase.messages.markAsSent(editMessageId,true)
-    #if ((targetMessage.expiresIn ?: 0) > 0) {
-    #  SignalDatabase.messages.markExpireStarted(editMessageId,envelope.timestamp!!)
-    #}
-    #return editMessageId
+//    val editMessageId = SignalDatabase.messages.insertEditMessageInbox(textMessage, targetMessage.threadId,false,null).orNull()
+//    SignalDatabase.messages.markAsSent(editMessageId,true)
+//    if ((targetMessage.expiresIn ?: 0) > 0) {
+//      SignalDatabase.messages.markExpireStarted(editMessageId,envelope.timestamp!!)
+//    }
+//    return editMessageId
   }
 }
